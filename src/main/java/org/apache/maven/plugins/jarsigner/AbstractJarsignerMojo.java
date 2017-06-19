@@ -42,11 +42,16 @@ import org.sonatype.plexus.components.sec.dispatcher.SecDispatcherException;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Maven Jarsigner Plugin base class.
@@ -265,18 +270,21 @@ public abstract class AbstractJarsignerMojo
                 jarSigner.setToolchain( toolchain );
             }
 
-            int processed = 0;
+            final AtomicInteger processed = new AtomicInteger( 0 );
 
             if ( this.archive != null )
             {
                 processArchive( this.archive );
-                processed++;
+                processed.incrementAndGet();
             }
             else
             {
                 if ( processMainArtifact )
                 {
-                    processed += processArtifact( this.project.getArtifact() ) ? 1 : 0;
+                    if ( processArtifact( this.project.getArtifact() ) )
+                    {
+                        processed.incrementAndGet();
+                    }
                 }
 
                 if ( processAttachedArtifacts && !Boolean.FALSE.equals( attachments ) )
@@ -307,7 +315,10 @@ public abstract class AbstractJarsignerMojo
                             continue;
                         }
 
-                        processed += processArtifact( artifact ) ? 1 : 0;
+                        if ( processArtifact( artifact ) )
+                        {
+                            processed.incrementAndGet();
+                        }
                     }
                 }
                 else
@@ -327,7 +338,7 @@ public abstract class AbstractJarsignerMojo
                     String includeList = ( includes != null ) ? StringUtils.join( includes, "," ) : null;
                     String excludeList = ( excludes != null ) ? StringUtils.join( excludes, "," ) : null;
 
-                    List<File> jarFiles;
+                    final List<File> jarFiles;
                     try
                     {
                         jarFiles = FileUtils.getFiles( archiveDirectory, includeList, excludeList );
@@ -338,21 +349,62 @@ public abstract class AbstractJarsignerMojo
                             + e.getMessage(), e );
                     }
 
-                    for ( File jarFile : jarFiles )
+                    final int numberOfForks = getNumberOfForks();
+                    if ( numberOfForks <= 1 )
                     {
-                        processArchive( jarFile );
-                        processed++;
+                        for ( File jarFile : jarFiles )
+                        {
+                            processArchive( jarFile );
+                            processed.incrementAndGet();
+                        }
+                    }
+                    else
+                    {
+                        final List<MojoExecutionException> errors =
+                                Collections.synchronizedList( new ArrayList<MojoExecutionException>() );
+                        ExecutorService executor = Executors.newFixedThreadPool( numberOfForks );
+                        for ( int forkIndex = 0; forkIndex < numberOfForks; forkIndex++ )
+                        {
+                            final int forkId = forkIndex;
+                            executor.execute( new Runnable()
+                            {
+                                public void run()
+                                {
+                                    for ( int i = forkId; i < jarFiles.size(); i += numberOfForks )
+                                    {
+                                        File jarFile = jarFiles.get( i );
+                                        try
+                                        {
+                                            processArchive( jarFile );
+                                        }
+                                        catch ( MojoExecutionException e )
+                                        {
+                                            getLog().warn( "Error processing " + jarFile, e );
+                                            errors.add( e );
+                                        }
+                                        processed.incrementAndGet();
+                                    }
+                                }
+                            } );
+                        }
+                        executor.shutdown();
+                        if ( !errors.isEmpty() )
+                        {
+                            throw errors.get( 0 );
+                        }
                     }
                 }
             }
 
-            getLog().info( getMessage( "processed", processed ) );
+            getLog().info( getMessage( "processed", processed.get() ) );
         }
         else
         {
             getLog().info( getMessage( "disabled", null ) );
         }
     }
+
+    protected abstract int getNumberOfForks();
 
     /**
      * Creates the jar signer request to be executed.

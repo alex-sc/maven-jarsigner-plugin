@@ -98,4 +98,9 @@ public class JarsignerVerifyMojo
             }
         }
     }
+
+    protected int getNumberOfForks()
+    {
+        return 1;
+    }
 }

@@ -30,7 +30,7 @@ under the License.
   </parent>
 
   <artifactId>maven-jarsigner-plugin</artifactId>
-  <version>1.4</version>
+  <version>1.4-parallel</version>
   <packaging>maven-plugin</packaging>
 
   <name>Apache Maven Jarsigner Plugin</name>

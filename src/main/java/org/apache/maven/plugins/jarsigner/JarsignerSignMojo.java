@@ -81,6 +81,9 @@ public class JarsignerSignMojo
     @Parameter( property = "jarsigner.tsacert" )
     private String tsacert;
 
+    @Parameter( property = "jarsigner.numberOfForks", defaultValue = "1" )
+    private int numberOfForks;
+
     @Override
     protected String getCommandlineInfo( final Commandline commandLine )
     {
@@ -127,4 +130,8 @@ public class JarsignerSignMojo
         return request;
     }
 
+    protected int getNumberOfForks()
+    {
+        return numberOfForks;
+    }
 }

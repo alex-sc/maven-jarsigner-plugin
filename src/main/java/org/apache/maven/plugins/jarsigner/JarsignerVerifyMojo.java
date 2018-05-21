@@ -37,7 +37,7 @@ import java.io.IOException;
  * @version $Id: JarsignerVerifyMojo.java 1640243 2014-11-17 22:12:18Z khmarbaise $
  * @since 1.0
  */
-@Mojo( name = "verify", defaultPhase = LifecyclePhase.VERIFY )
+@Mojo( name = "verify", defaultPhase = LifecyclePhase.VERIFY, threadSafe = true  )
 public class JarsignerVerifyMojo
     extends AbstractJarsignerMojo
 {

@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -388,6 +389,14 @@ public abstract class AbstractJarsignerMojo
                             } );
                         }
                         executor.shutdown();
+                        try 
+                        {
+                          executor.awaitTermination( 10, TimeUnit.MINUTES );
+                        } 
+                        catch ( InterruptedException ex )
+                        {
+                          getLog().warn( "Timeout while signing jars in parallel", ex );
+                        }
                         if ( !errors.isEmpty() )
                         {
                             throw errors.get( 0 );
